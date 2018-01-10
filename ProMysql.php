@@ -40,6 +40,13 @@ class ProMysql{
 
 	}
 
+
+	/**
+	 * [count]
+	 *
+	 * @return [int] [The number of eligible data]
+	 *         [Boolean]
+	 */
 	public function count()
 	{
 		$this->sql['select'] = 'COUNT(*)';
@@ -56,6 +63,11 @@ class ProMysql{
 	}
 
 
+	/**
+	 * [Get a single field]
+	 *
+	 * @return [type] [The field with you need]
+	 */
 	public function findIt()
 	{
 		$this->sql['limit'] = 'LIMIT 1';
@@ -71,6 +83,14 @@ class ProMysql{
 	}
 
 
+	/**
+	 * [Get a row data]
+	 *
+	 * @return [array]
+	 *         		[boolean] [flag]
+	 *         	 	[string]  [message]
+	 *         	 	[string]  [sql]
+	 */
 	public function find()
 	{
 		$this->sql['limit'] = 'LIMIT 1';
@@ -85,12 +105,31 @@ class ProMysql{
 		return $result;
 	}
 
+	/**
+	 * [Get data]
+	 *
+	 * @return [array]
+		 *          [boolean] 	[flag]
+		 *         	[array]  	[data]
+		 *         	[string]  	[message]
+		 *         	[string]  	[sql]
+	 */
 	public function get()
 	{
 		$sql = 'SELECT '.implode(' ', $this->sql);
 		return $this->query($sql);
 	}
 
+	/**
+	 * [Insert]
+	 * @param  [type] $data [description]
+	 *
+	 * @return [array]
+	 *          	[boolean] 	[flag]
+	 *         	 	[int]  		[the number of include rows]
+	 *         	 	[string]  	[message]
+	 *         	  	[string]  	[sql]
+	 */
 	public function insert($data)
 	{
 		if(!is_array($data)) return false;
@@ -106,11 +145,12 @@ class ProMysql{
 	}
 
 	/**
-	 * [update description]
+	 * [update]
 	 * @param  [type] $data [description]
+	 *
 	 * @return [array]
 	 *         		[boole]   flag    [flag]
-	 *         		[int]     data    [include number of rows]
+	 *         		[int]     data    [the number of include rows]
 	 */
 	public function update($data)
 	{
@@ -124,6 +164,14 @@ class ProMysql{
 		return $this->exec($sql);
 	}
 
+	/**
+	 * [leftJoin]
+	 * @param  [string] $table  [table]
+	 * @param  [string] $field1 [relevance table]
+	 * @param  [string] $field2 [main table]
+	 *
+	 * @return [object] [itself]
+	 */
 	public function leftJoin($table, $field1, $field2)
 	{
 		$this->sql['leftJoin'] = 'left join '.$this->prefix.$table.' on '.$field1.' = '.$field2;
@@ -144,7 +192,7 @@ class ProMysql{
 	 * @example where('id', 1)
 	 * @example where('id', '=', 1)
 	 * @example where($data)	[array]
-	 * @return [object]    self    [itself]
+	 * @return [object] [itself]
 	 */
 	public function where($where)
 	{
