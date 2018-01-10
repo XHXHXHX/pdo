@@ -40,6 +40,22 @@ class ProMysql{
 
 	}
 
+	public function count()
+	{
+		$this->sql['select'] = 'COUNT(*)';
+
+		$sql = 'SELECT '.implode(' ', $this->sql);
+
+		$result = $this->query($sql);
+
+		if($result['flag'])
+			return (int)($result['data'][0]['COUNT(*)']) ?? FALSE;
+		else
+			return FALSE;
+
+	}
+
+
 	public function findIt()
 	{
 		$this->sql['limit'] = 'LIMIT 1';
@@ -49,15 +65,12 @@ class ProMysql{
 		$result = $this->query($sql);
 
 		if($result['flag'])
-			return $result['data'][0][$this->after_field] ?? null;
+			return $result['data'][0][$this->after_field] ?? FALSE;
 		else
 			return FALSE;
 	}
 
-	/**
-	 * [Find It!!!!]
-	 * @return [string] [It]
-	 */
+
 	public function find()
 	{
 		$this->sql['limit'] = 'LIMIT 1';
@@ -75,7 +88,6 @@ class ProMysql{
 	public function get()
 	{
 		$sql = 'SELECT '.implode(' ', $this->sql);
-
 		return $this->query($sql);
 	}
 
@@ -150,7 +162,10 @@ class ProMysql{
 				}
 			}
 
-			$this->sql['where'] = ' WHERE '. implode($this->com, $arr);
+			if(empty($this->sql['where']))
+				$this->sql['where'] = ' WHERE '. implode($this->com, $arr);
+			else
+				$this->sql['where'] .= $this->com. implode($this->com, $arr);
 		}
 		else{
 			$count = func_num_args();
@@ -159,13 +174,21 @@ class ProMysql{
 			if($count > 1)
 			{
 				if($count == 3){
-					$this->sql['where'] = ' WHERE '.$args[0].' '.$args[1].' "'.$args[2].'"';
+					if(empty($this->sql['where']))
+						$this->sql['where'] = ' WHERE '.$args[0].' '.$args[1].' "'.$args[2].'"';
+					else
+						$this->sql['where'] .= $this->com.$args[0].' '.$args[1].' "'.$args[2].'"';
 				}else{
-					$this->sql['where'] = ' WHERE '.$args[0].' = "'.$args[1].'"';
-
+					if(empty($this->sql['where']))
+						$this->sql['where'] = ' WHERE '.$args[0].' = "'.$args[1].'"';
+					else
+						$this->sql['where'] .= $this->com.$args[0].' = "'.$args[1].'"';
 				}
 			}else{
-				$this->sql['where'] = ' WHERE '.$where;
+				if(empty($this->sql['where']))
+					$this->sql['where'] = ' WHERE '. $where;
+				else
+					$this->sql['where'] .= $this->com. $where;
 			}
 		}
 		return $this;
