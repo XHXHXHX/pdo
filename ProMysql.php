@@ -11,7 +11,10 @@ class ProMysql{
 
 	public $prefix = 'app_';
 
+	public $prepared = FALSE;
+
 	private $db = '';
+	private $stmt = '';
 
 	protected $table = '';
 	protected $com = ' AND ';
@@ -25,6 +28,9 @@ class ProMysql{
 					'group' => '',
 					'order' => '',
 					'limit' => ''];
+
+	protected $where_param = [];
+	protected $bind_param = [];
 
 	public function __construct($str = null)
 	{
@@ -53,7 +59,11 @@ class ProMysql{
 
 		$sql = 'SELECT '.implode(' ', $this->sql);
 
-		$result = $this->query($sql);
+		$this->stmt = $this->db->prepare($sql);
+
+		$this->bindParam($this->bind_param);
+
+		$result = $this->query($this->where_param);
 
 		if($result['flag'])
 			return (int)($result['data'][0]['COUNT(*)']) ?? FALSE;
@@ -74,7 +84,11 @@ class ProMysql{
 
 		$sql = 'SELECT '.implode(' ', $this->sql);
 
-		$result = $this->query($sql);
+		$this->stmt = $this->db->prepare($sql);
+
+		$this->bindParam($this->bind_param);
+
+		$result = $this->query($this->where_param);
 
 		if($result['flag'])
 			return $result['data'][0][$this->after_field] ?? FALSE;
@@ -97,7 +111,11 @@ class ProMysql{
 
 		$sql = 'SELECT '.implode(' ', $this->sql);
 
-		$result = $this->query($sql);
+		$this->stmt = $this->db->prepare($sql);
+
+		$this->bindParam($this->bind_param);
+
+		$result = $this->query($this->where_param);
 
 		if($result['flag'])
 			$result['data'] = $result['data'][0];
@@ -117,7 +135,12 @@ class ProMysql{
 	public function get()
 	{
 		$sql = 'SELECT '.implode(' ', $this->sql);
-		return $this->query($sql);
+
+		$this->stmt = $this->db->prepare($sql);
+
+		$this->bindParam($this->bind_param);
+
+		return $this->query($this->where_param);
 	}
 
 	/**
@@ -134,15 +157,36 @@ class ProMysql{
 	{
 		if(!is_array($data)) return false;
 
-		foreach ($data as $key => $value) {
-			$name[] = $key;
-			$values[] = '"'.$value.'"';
+		if(isset($data[0]))
+		{
+			foreach ($data[0] as $key => $value) {
+				$name[] = $key;
+				$values[] = ':'.$key;
+			}
+		}else{
+			foreach ($data as $key => $value) {
+				$name[] = $key;
+				$values[] = ':'.$key;
+			}
 		}
 
 		$sql = 'INSERT INTO '. $this->table . ' (' .implode(",", $name).')' . ' VALUES(' . implode(",", $values) .')';
 
-		return $this->exec($sql);
+		$this->stmt = $this->db->prepare($sql);
+
+		$this->bindParam($name);
+
+		if(isset($data[0]))
+		{
+			foreach ($data as $key => $value) {
+				$res = $this->exec($value);
+			}
+		}else{
+			return $this->exec($data);
+		}
+
 	}
+
 
 	/**
 	 * [update]
@@ -157,11 +201,34 @@ class ProMysql{
 		if(!is_array($data)) return false;
 
 		foreach ($data as $key => $value) {
-			$update[] = $key . ' = "' . $value . '"';
+			$update[] = $key . ' = :' . $key;
 		}
 
 		$sql = 'UPDATE '. $this->table . ' SET '. implode(",", $update). $this->sql["where"];
-		return $this->exec($sql);
+
+		$this->stmt = $this->db->prepare($sql);
+
+		$this->bindParam($update);
+
+		//where_param与更新数据合并
+		if(!empty($this->where_param))
+			$data = array_merge($data, $this->where_param);
+
+		return $this->exec($data);
+	}
+
+
+	public function delete()
+	{
+		$this->sql['select'] = '';
+
+		$sql = 'DELETE '.implode(' ', $this->sql);
+
+		$this->stmt = $this->db->prepare($sql);
+
+		$this->bindParam($this->bind_param);
+
+		return $this->exec($this->where_param);
 	}
 
 	/**
@@ -188,7 +255,7 @@ class ProMysql{
 	/**
 	 * [where description]
 	 * @param  [string|array] $where [description]
-	 * @example where('id = 1')
+	 * @example where('id = 1')    暂不支持
 	 * @example where('id', 1)
 	 * @example where('id', '=', 1)
 	 * @example where($data)	[array]
@@ -204,9 +271,17 @@ class ProMysql{
 				{
 					if(in_array($value[0], ['like', 'LIKE']))
 						$value[1] = '%'.$value[1].'%';
-					$arr[] = $key .' '. $value[0]. ' "'. $value[1].'"';
+
+					$this->where_param[$key] = $value[1];
+					$this->bind_param[] = $key;
+
+					$arr[] = $key .' '. $value[0]. ' :'. $key;
 				}else{
-					$arr[] = $key . ' = '. $value;
+
+					$this->where_param[$key] = $value;
+					$this->bind_param[] = $key;
+
+					$arr[] = $key . ' = :'. $key;
 				}
 			}
 
@@ -222,23 +297,49 @@ class ProMysql{
 			if($count > 1)
 			{
 				if($count == 3){
-					if(empty($this->sql['where']))
-						$this->sql['where'] = ' WHERE '.$args[0].' '.$args[1].' "'.$args[2].'"';
-					else
-						$this->sql['where'] .= $this->com.$args[0].' '.$args[1].' "'.$args[2].'"';
+					if(empty($this->sql['where'])) {
+
+						$this->where_param[$args[0]] = $args[2];
+						$this->bind_param[] = $args[0];
+
+						$this->sql['where'] = ' WHERE '.$args[0].' '.$args[1].' :'.$args[0];
+
+					}
+					else {
+
+						$this->where_param[$args[0]] = $args[2];
+						$this->bind_param[] = $args[0];
+
+						$this->sql['where'] .= $this->com.$args[0].' '.$args[1].' :'.$args[0];
+					}
+
 				}else{
-					if(empty($this->sql['where']))
-						$this->sql['where'] = ' WHERE '.$args[0].' = "'.$args[1].'"';
-					else
-						$this->sql['where'] .= $this->com.$args[0].' = "'.$args[1].'"';
+					if(empty($this->sql['where'])) {
+
+						$this->where_param[$args[0]] = $args[1];
+						$this->bind_param[] = $args[0];
+
+						$this->sql['where'] = ' WHERE '.$args[0].' = :'.$args[0];
+					}
+					else {
+
+						$this->where_param[$args[0]] = $args[1];
+						$this->bind_param[] = $args[0];
+
+						$this->sql['where'] .= $this->com.$args[0].' = :'.$args[0];
+					}
 				}
-			}else{
-				if(empty($this->sql['where']))
-					$this->sql['where'] = ' WHERE '. $where;
-				else
-					$this->sql['where'] .= $this->com. $where;
 			}
 		}
+		return $this;
+	}
+
+	public function orWhere($where)
+	{
+		$this->com = ' OR ';
+		$this->where($where);
+		$this->com = ' AND ';
+
 		return $this;
 	}
 
@@ -281,18 +382,18 @@ class ProMysql{
 		return $this;
 	}
 
-	protected function query($sql)
+	protected function query($data)
 	{
 		try {
-			$info = $this->db->query($sql);
+			$info = $this->stmt->execute($data);
 		} catch (Exception $e) {
 			$result['flag'] = FALSE;
 			$result['msg'] = $e->errorInfo[2];
-			$result['sql'] = $sql;
+			$result['sql'] = $this->stmt->queryString;
 			return $result;
 		}
 
-		while ($row[] = $info->fetch(PDO::FETCH_ASSOC)){}
+		while ($row[] = $this->stmt->fetch(PDO::FETCH_ASSOC)){}
 		array_pop($row);
 
 		$this->after_field = $this->sql['select'];
@@ -305,22 +406,30 @@ class ProMysql{
 		return $result;
 	}
 
-	protected function exec($sql)
+	protected function exec($data)
 	{
 		try {
-			$info = $this->db->exec($sql);
+			$info = $this->stmt->execute($data);
 		} catch (Exception $e) {
 			$result['flag'] = FALSE;
-			$result['msg'] = $e->errorInfo[2];
-			$result['sql'] = $sql;
+			$result['msg'] = $e->errorInfo[2] ?? null;
+			$result['sql'] = $this->stmt->queryString;
 			return $result;
 		}
 
 		$this->init();
 
 		$result['flag'] = TRUE;
-		$result['data'] = $info;
+		$result['data'] = $this->stmt->rowCount();
 		return $result;
+	}
+
+	//绑定
+	protected function bindParam($key)
+	{
+		foreach ($key as $val) {
+			$this->stmt->bindParam(':'.$val, $val);
+		}
 	}
 
 	protected function init()
