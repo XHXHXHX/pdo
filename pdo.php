@@ -8,11 +8,12 @@ class Mysql{
     private $unique_prefix_length = 6;      // 唯一性前缀长度
     private $unique_string = '0123456789~!@#$%^&*()-=_+[]{},.M<>?abcdefghijklmnopqrstuvwxyzABCDEFGHIGKLMNOPQRSTUVWXYZ';
     private $could_allow_function = [
-        'getErrorCode',             // 获取错误号
+        'errorCode',             // 获取错误号
         'getRow',                   // 获取结果集
-        'getExecuteSql',            // 获取执行sql
+        'executeSql',            // 获取执行sql
         'errorMessage',             // 获取错误信息
         'rowCount',                 // 获取影响行数
+        'releaseStmt',              // 释放预处理语句对象
     ];
 
     public static $instance;
@@ -30,7 +31,7 @@ class Mysql{
     protected function getConfig($config_filename)
     {
         if($config_filename && is_file($config_filename)) {
-            $config = require_once("db_config.php");
+            $config = require_once($config_filename);
             return $config;
         }
 
@@ -67,7 +68,7 @@ class Mysql{
     public function __call($name, $arguments)
     {
         $key = $arguments[0] ?? false;
-        if(!in_arrar($name, $this->could_allow_function) || !$key || array_key_exists($key, $this->stmt_arr))
+        if(!in_array($name, $this->could_allow_function) || !$key || !array_key_exists($key, $this->stmt_arr))
             return false;
 
         return $this->$name($this->stmt_arr[$key]);
@@ -77,14 +78,13 @@ class Mysql{
     public function query($sql){
 
         try{
-            $result = $this->con->query($this->con->quote($sql));
+            $result = $this->con->query($sql, PDO::FETCH_ASSOC);
+            return $result;
         } catch (Exception $e) {
             $this->errorMessage($this->con->errorInfo(), $e);
         }
 
-        $this->return['data'] = $result;
-
-        return $this->return;
+        return [$this->con->errorInfo(), $e];
     }
 
     /*适合查询数量*/
@@ -99,64 +99,14 @@ class Mysql{
         try {
             $stmt->execute();
 
-            $unique_key = $this->makeUniqid();
-            $this->stmt_arr[$unique_key] = $stmt;
-
-            return $unique_key;
         } catch (Exception $e) {
-            $this->errorMessage($stmt->queryString, $e);
-            return [$stmt->queryString, $e];
+
         }
-    }
 
-    /*
-     * 获取影响行数
-     * */
-    protected function rowCount($stmt)
-    {
-        return $stmt->rowCount();
-    }
+        $unique_key = $this->makeUniqid();
+        $this->stmt_arr[$unique_key] = $stmt;
 
-    /*
-     * 获取错误码
-     * */
-    protected function getErrorCode($stmt)
-    {
-        return $stmt->errorCode();
-    }
-
-    /*
-     * 获取查询结果集
-     * */
-    protected function getRow($stmt)
-    {
-        while ($row[] = $stmt->fetch(PDO::FETCH_ASSOC)){}
-        array_pop($row);
-
-        return $row;
-    }
-
-    /*
-     * 获取执行sql
-     * */
-    protected function getExecuteSql($stmt)
-    {
-        ob_start();
-        $stmt->debugDumpParams();
-        $debug_info = ob_get_contents();
-        ob_end_clean();
-        ob_flush();
-        flush();
-        preg_match('/Sent SQL:[\s\S]*\]([\s\S]*?)P/', $debug_info, $match);
-        $sql = $match[1] ?? '';
-        return trim($sql);
-    }
-
-    protected function errorMessage($sql, $error)
-    {
-        $this->return['sql'] = $sql;
-        $this->return['errorInfo'] = $error->errorInfo[2];
-
+        return $unique_key;
     }
 
     protected function bindParams($stmt, $params)
@@ -165,9 +115,81 @@ class Mysql{
             return;
 
         foreach($params as $key => $value) {
+            if(is_array($value))
+                $value = implode(',', $value);
             $stmt->bindParam(':'.$key, $value);
         }
     }
+
+    # 获取影响行数
+    protected function rowCount($stmt)
+    {
+        return $stmt->rowCount();
+    }
+
+    # 获取错误码
+    protected function errorCode($stmt)
+    {
+        return $stmt->errorCode();
+    }
+
+    # 获取查询结果集
+    protected function getRow($stmt)
+    {
+        while ($row[] = $stmt->fetch(PDO::FETCH_ASSOC)){}
+        array_pop($row);
+
+        return $row;
+    }
+
+    # 获取执行sql
+    protected function executeSql($stmt)
+    {
+        ob_start();
+        $stmt->debugDumpParams();
+        $debug_info = ob_get_contents();
+        ob_end_clean();
+        ob_flush();
+        flush();
+        preg_match('/Sent SQL:[\s\S]*\]([\s\S]*?)P/', $debug_info, $match);
+        $match[1] ?? preg_match('/SQL:[\s\S]*\]([\s\S]*?)P/', $debug_info, $match);
+        $sql = $match[1] ?? '';
+        return trim($sql);
+    }
+
+    # 获取错误信息
+    protected function errorMessage($stmt)
+    {
+        return $stmt->errorInfo();
+
+    }
+
+    # 开启事务
+    protected function beginTransaction()
+    {
+        $this->con->beginTransaction();
+    }
+
+    # 提交事务
+    protected function commit()
+    {
+        if(PDO::inTransaction())
+            $this->con->commit();
+    }
+
+    # 回滚事务
+    protected function rollBack()
+    {
+        if(PDO::inTransaction())
+            $this->con->rollBack();
+    }
+
+    # 释放语句对象
+    protected function releaseStmt($key)
+    {
+        unset($this->stmt_arr[$key]);
+    }
+
     /*
      * 唯一性ID
      *
