@@ -145,6 +145,8 @@ class Mysql{
         $stmt->debugDumpParams();
         $debug_info = ob_get_contents();
         ob_end_clean();
+        ob_flush();
+        flush();
         preg_match('/Sent SQL:[\s\S]*\]([\s\S]*?)P/', $debug_info, $match);
         $sql = $match[1] ?? '';
         return trim($sql);
