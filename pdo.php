@@ -13,7 +13,7 @@ class Mysql{
         'getExecuteSql',            // 获取执行sql
         'errorMessage',             // 获取错误信息
         'rowCount',                 // 获取影响行数
-    ]
+    ];
 
     public static $instance;
 
