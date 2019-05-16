@@ -1,5 +1,7 @@
 <?php
 
+namespace pro\Database;
+
 class Mysql{
 
     private $con;
@@ -8,9 +10,9 @@ class Mysql{
     private $unique_prefix_length = 6;      // 唯一性前缀长度
     private $unique_string = '0123456789~!@#$%^&*()-=_+[]{},.M<>?abcdefghijklmnopqrstuvwxyzABCDEFGHIGKLMNOPQRSTUVWXYZ';
     private $could_allow_function = [
-        'errorCode',             // 获取错误号
+        'errorCode',                // 获取错误号
         'getRow',                   // 获取结果集
-        'executeSql',            // 获取执行sql
+        'executeSql',               // 获取执行sql
         'errorMessage',             // 获取错误信息
         'rowCount',                 // 获取影响行数
         'releaseStmt',              // 释放预处理语句对象
@@ -75,17 +77,7 @@ class Mysql{
     }
 
     /*适合查询*/
-    public function query($sql){
-
-        try{
-            $result = $this->con->query($sql, PDO::FETCH_ASSOC);
-            return $result;
-        } catch (Exception $e) {
-            $this->errorMessage($this->con->errorInfo(), $e);
-        }
-
-        return [$this->con->errorInfo(), $e];
-    }
+    public function query($sql){}
 
     /*适合查询数量*/
     public function exec(){}
@@ -96,12 +88,7 @@ class Mysql{
         $stmt = $this->con->prepare($sql);
         $this->bindParams($stmt, $params);
 
-        try {
-            $stmt->execute();
-
-        } catch (Exception $e) {
-
-        }
+        $stmt->execute();
 
         $unique_key = $this->makeUniqid();
         $this->stmt_arr[$unique_key] = $stmt;
@@ -162,6 +149,13 @@ class Mysql{
     {
         return $stmt->errorInfo();
 
+    }
+
+    # 关闭本次执行
+    public function closeStmt($key)
+    {
+        if($this->stmt_arr[$key] ?? false)
+            unset($this->stmt_arr[$key]);
     }
 
     # 开启事务

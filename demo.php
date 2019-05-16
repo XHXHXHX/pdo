@@ -1,10 +1,12 @@
 <?php
+
+namespace pro;
 //define('DB_CONFIG_PATH', 'db_config.php');
 //require "ProMysql.php";
 //
 //$ProMysql = new ProMysql();
 //
-//$select = $ProMysql->table('product_copy')
+//$select = $ProMysql->table('  product_copy')
 //			->leftJoin('product', 'pro_id', 'con_pro_id')
 //			->where('pro_id', '<', 100)
 //			->where('pro_id', '>=', 1)
@@ -12,14 +14,35 @@
 //			->limit(2)
 //			->get();
 
-require 'pdo.php';
+use Database\DB;
 
-$DB = Mysql::instance('db_config.php');
-$sql = 'SELECT * FROM test WHERE a = :a';
-$result = $DB->execute($sql, ['a'=>1]);
-var_dump($DB->getExecuteSql($result));
+spl_autoload_register(function ($class) {
+    if ($class) {
+        $file = str_replace('\\', '/', $class);
+        $file .= '.php';
+        echo $file,'<br>';
+        if (file_exists($file)) {
+            include $file;
+        }
+    }
+});
+
+$res = new DB();
+//$res = DB::table('test')->select('a')->where('a', 1)->get();
+//var_dump($res);
+
+//new \pro\Database\test;
+
+
+
+//namespace pro\Database;
+//
+//class test{
+//    public function __construct()
+//    {
+//        echo 2;
+//    }
+//}
 
 //setValue();
-;
 
-//  最终Util
