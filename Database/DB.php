@@ -187,7 +187,7 @@ class DB extends DB_Base {
     public function select(...$field)
     {
         $this->select = $field;
-        return $this;
+        return $this; 
     }
 
     public function selectRaw($string)
