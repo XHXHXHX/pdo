@@ -1,19 +1,25 @@
 <?php
 
-namespace pro\Database;
+namespace Database;
 
 class DB extends DB_Base {
 
-    public $prefix = '';
-    public $table = '';
+    public $prefix = 'gm_';
+    public $table = [];
     public $where = [];
-    public $select = [];
     public $join = [];
+
+    public $select = [];
     public $orderBy = [];
     public $groupBy = '';
     public $limit = 0;
     public $offset = 0;
     public $having = '';
+
+    public $update;
+    public $increment = [];
+
+    public $insert;
 
     protected $defaultLimit = 15;
 
@@ -31,10 +37,16 @@ class DB extends DB_Base {
         parent::__construct();
     }
 
-    public static function table($table)
+    public static function table($table, $alias = '')
     {
         $instance = new self;
-        $instance->table = $table;
+
+        if(empty($alias))
+            list($table, $alias) = $instance->splitAlias($table);
+
+        $instance->table['table'] = $table;
+        $instance->table['alias'] = $alias;
+
         return $instance;
     }
 
@@ -65,16 +77,25 @@ class DB extends DB_Base {
 
     public function where($field, $operator = null, $value = null, $relation_type = 'and')
     {
-        if(!$field || ($field && !$operator))
-            return $this;       # 抛异常
-
         if(is_array($field))
             return $this->addArrayWhere($field, $relation_type);
+
+        if(is_null($operator) && is_null($value))
+            $value = $operator = '';
 
         if(is_null($value)){
             $value = $operator;
             $operator = '=';
         }
+
+        if(strpos($field, '.') !== false) {
+            $field = explode('.', $field);
+            $field[1] = "`{$field[1]}`";
+            $field = implode('.', $field);
+        }else{
+            $field = "`{$field}`";
+        }
+
 
         $this->where[] = compact(
             'field', 'operator', 'value', 'relation_type'
@@ -85,12 +106,12 @@ class DB extends DB_Base {
 
     public function whereIn($key, array $ids, $relation_type = 'and')
     {
-        return $this->where($key, 'in', implode(',', $ids), $relation_type);
+        return $this->where($key, 'in', $ids, $relation_type);
     }
 
     public function whereNotIn($key, array $ids, $relation_type = 'and')
     {
-        return $this->where($key, 'not in', implode(',', $ids), $relation_type);
+        return $this->where($key, 'not in', $ids, $relation_type);
     }
 
     public function whereBetween($key, array $range, $relation_type = 'and')
@@ -163,7 +184,7 @@ class DB extends DB_Base {
         return $this->whereNotLike($key, $value, 'or');
     }
 
-    public function select(array $field = ['*'])
+    public function select(...$field)
     {
         $this->select = $field;
         return $this;
@@ -178,7 +199,7 @@ class DB extends DB_Base {
     public function orderBy($field, $option = 'asc')
     {
         $this->orderBy[] = $field . ' ' . $option;
-        return;
+        return $this;
     }
 
     public function orderByDesc($field)
@@ -189,7 +210,7 @@ class DB extends DB_Base {
     public function groupBy($value)
     {
         $this->groupBy = $value;
-        return;
+        return $this;
     }
 
     public function limit($num)
@@ -201,7 +222,7 @@ class DB extends DB_Base {
     public function offset($num)
     {
         $this->offset = $num;
-        return $num;
+        return $this;
     }
 
     public function having($string)
@@ -212,6 +233,8 @@ class DB extends DB_Base {
 
     public function join($type, $table, $table_field, $operator, $other_field = '', $alias = '')
     {
+        list($table, $alias) = $this->splitAlias($table);
+
         $this->join[] = compact(
           'type', 'table', 'table_field', 'operator', 'other_field', 'alias'
         );
@@ -220,17 +243,17 @@ class DB extends DB_Base {
 
     public function leftJoin($table, $table_field, $operator, $other_field = '', $alias = '')
     {
-        return $this->join('LEFTJOIN', $table, $table_field, $operator, $other_field, $alias);
+        return $this->join('left join', $table, $table_field, $operator, $other_field, $alias);
     }
 
     public function rightJoin($table, $table_field, $operator, $other_field = '', $alias = '')
     {
-        return $this->join('RIGHTJOIN', $table, $table_field, $operator, $other_field, $alias);
+        return $this->join('right join', $table, $table_field, $operator, $other_field, $alias);
     }
 
     public function innerJoin($table, $table_field, $operator, $other_field = '', $alias = '')
     {
-        return $this->join('INNERJOIN', $table, $table_field, $operator, $other_field, $alias);
+        return $this->join('inner join', $table, $table_field, $operator, $other_field, $alias);
     }
 
     # 获取全部
@@ -238,21 +261,19 @@ class DB extends DB_Base {
     {
         $this->selectConvenient($field);
 
-        $model = new Model($this);
-
-        return $model->select();
+        return $this->execute(Model::select($this));
     }
 
     # 获取一条
-    public function find($field = [])
+    public function find()
     {
-        $this->selectConvenient($field);
+        $this->selectConvenient();
 
         $this->limit = 1;
 
-        $model = new Model($this);
+        $row = $this->execute(Model::select($this));
 
-        return $model->select();
+        return $row[0] ?? [];
     }
 
     # 获取单个字段
@@ -260,27 +281,87 @@ class DB extends DB_Base {
     {
         $this->select = [$field];
 
-        $model = new Model($this);
+        $this->limit = 1;
 
-        return $model->select();
+        $row = $this->execute(Model::select($this));
+
+        return $row[0][$field] ?? '';
     }
 
     # 同 laravel
     public function pluck($value, $key = '')
     {
-        $this->select = [$value, $key];
+        $this->select = [$value];
+        if($key)
+            $this->select[] = $key;
 
-        $model = new Model($this);
+        $row = $this->execute(Model::select($this));
 
-        return $model->pluck([$key => $value]);
+        if($key)
+            return array_column($row, $value, $key);
+        else
+            return array_column($row, $value);
     }
-    public function update() {}
-    public function insert() {}
-    public function delete() {}
 
-    public function execute($sql, array $params = [])
+    /*
+     * 自增
+     *
+     * ['age', 'birth']
+     * [['age', '+ 1], ['birth', '- 3]]
+     * */
+    public function increment($field, $value = '+ 1')
     {
-        return $this->_execute($sql, $params);
+        if(!is_array($field)) {
+            $this->increment[] = compact('field', 'value');
+            return $this;
+        }else{
+            foreach ($field as $item) {
+                if(is_array($item))
+                    $this->increment($item[0], $item[1] ?? 1);
+                else
+                    $this->increment($item);
+            }
+        }
+    }
+
+    /* UPDATE
+     *
+     * @param   data    array(hash 一维数组)   更新数据
+     *
+     * @return  int     影响行数*/
+    public function update(array $data = [])
+    {
+        if(empty($data) && empty($this->increment))
+            throw new \Exception('别闹');
+
+        $this->update = $data;
+
+        return $this->execute(Model::update($this), 'update');
+
+    }
+    public function insert(array $data)
+    {
+        if(empty($data))
+            throw new \Exception('别闹');
+
+        $this->insert = $data;
+
+        return $this->execute(Model::insert($this), 'insert');
+
+    }
+    public function delete()
+    {
+        return $this->execute(Model::delete($this), 'delete');
+    }
+
+    public function softDelete() {}
+
+    public function execute($sql_arr, $type = 'select')
+    {
+        $func = '_'.$type;
+        var_dump($sql_arr);
+
+        return $this->$func($sql_arr['sql'], $sql_arr['params']);
     }
 
     public static function beginTransaction() {}
@@ -288,7 +369,7 @@ class DB extends DB_Base {
     public static function callBack() {}
 
     /*便捷查询*/
-    protected function selectConvenient($field)
+    protected function selectConvenient($field = [])
     {
         if(!$field) {
             if(empty($this->select))
@@ -303,21 +384,15 @@ class DB extends DB_Base {
 
     }
 
-
-    protected function replaceParam($value, $key)
+    protected function splitAlias($str)
     {
-        if(strpos($value, '%') == 0)
-        {
-            if(strrpos($value, '%') == strlen($value) - 1)
-            {
-                $value = '%:' . $key . '%';
-            }else{
-                $value = '%:' . $key;
-            }
-        }else{
-            $value = ':'.$key;
-        }
+        $alias = '';
 
-        return $value;
+        if(stripos($str, 'as') !== FALSE) {
+            $str = explode(' ', $str);
+            $alias = $str[2];
+            $str = $str[0];
+        }
+        return [$str, $alias];
     }
 }

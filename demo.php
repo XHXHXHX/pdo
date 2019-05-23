@@ -1,7 +1,7 @@
 <?php
 
 namespace pro;
-//define('DB_CONFIG_PATH', 'db_config.php');
+define('DB_CONFIG_PATH', 'db_config.php');
 //require "ProMysql.php";
 //
 //$ProMysql = new ProMysql();
@@ -13,36 +13,43 @@ namespace pro;
 //			->select('pro_id', 'pro_name', 'pro_recordCode', 'pro_str', 'pro_is_suit_gravida', 'pro_otherName', 'pro_type_id', 'pro_safe_level', 'pro_img', 'pro_oldImg')
 //			->limit(2)
 //			->get();
-
+//
+//use Database\MyPdo;
 use Database\DB;
+//
+//require_once 'Database\MyPdo.php';
 
 spl_autoload_register(function ($class) {
     if ($class) {
-        $file = str_replace('\\', '/', $class);
+        $file = str_replace('\\', DIRECTORY_SEPARATOR, $class);
         $file .= '.php';
-        echo $file,'<br>';
         if (file_exists($file)) {
             include $file;
         }
     }
 });
 
-$res = new DB();
-//$res = DB::table('test')->select('a')->where('a', 1)->get();
-//var_dump($res);
+$where = [
+    ['c', 'like', '%1%\'--\''],
+    'a' => 4,
+    ['b', 'in', [1,2,3]],
+];
 
-//new \pro\Database\test;
+//$res = DB::table('test')->insert([
+//    ['b' => 10, 'c' => 10,  'd' => 10,  'e' => 'i'],
+//    ['b' => 11, 'c' => 11,  'd' => 11,  'e' => 'j'],
+//    ['b' => 12, 'c' => 12,  'd' => 12,  'e' => 'k'],
+//]);
 
+$res = DB::table('class as c')
+        ->select('c.name as class_name', 's.name as student_name', 's.age', 's.sex')
+        ->leftJoin('relation_class_students as r', 'r.class_id', '=', 'c.id')
+        ->leftJoin('students as s', 'r.student_id', '=', 's.id')
+        ->where('c.grade', 1)
+        ->where('c.class', 1)
+        ->get();
 
-
-//namespace pro\Database;
-//
-//class test{
-//    public function __construct()
-//    {
-//        echo 2;
-//    }
-//}
-
-//setValue();
-
+echo '<br>', $res ? 'success' : 'faild', '<br>';
+var_dump($res);
+//MyPdo::instance();
+//new MyPdo();

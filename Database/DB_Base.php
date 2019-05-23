@@ -1,11 +1,14 @@
 <?php
 
-namespace pro\Database;
+namespace Database;
+
+use mysql_xdevapi\Exception;
 
 class DB_Base {
 
     private $pdo;
     private $correctErrorCode = '00000';
+    private $stmt_key;
 
     public $items;
     public $rowNum;
@@ -15,54 +18,88 @@ class DB_Base {
 
     public function __construct()
     {
-        $this->pdo = Mysql::instance();
+        $this->pdo = MyPdo::instance();
     }
 
     # 执行 sql
-    protected function _execute($sql, $params = []) {
-        if($stmt_key = $this->pdo->execute($sql, $params))
-            return false;
-
-        $this->errorCode = $this->pdo->errorCode($stmt_key);
-
-        if($this->errorCode != $this->correctErrorCode)
-            return $this->errorResult($stmt_key);
-
-        return $this->resultInfo($stmt_key, false);
+    protected function _execute($sql, $params = [])
+    {
+        $this->stmt_key = $this->pdo->execute($sql, $params);
     }
 
-    protected function _select($sql, $params = []) {}
-    protected function _insert($sql, $params = []) {}
-    protected function _update($sql, $params = []) {}
-    protected function _delete($sql, $params = []) {}
+    protected function _select($sql, $params = [])
+    {
+        $this->_execute($sql, $params);
 
-    private function resultInfo($stmt_key, $is_select = false)
+        $this->resultInfo();
+
+        $this->closePdo();
+
+        return $this->items;
+    }
+    protected function _insert($sql, $params = [])
+    {
+        $this->_execute($sql, $params);
+
+        $this->resultInfo(false);
+
+        $this->closePdo();
+
+        return $this->rowNum;
+    }
+    protected function _update($sql, $params = [])
+    {
+        $this->_execute($sql, $params);
+
+        $this->resultInfo(false);
+
+        $this->closePdo();
+
+        return $this->rowNum;
+    }
+    protected function _delete($sql, $params = [])
+    {
+        $this->_execute($sql, $params);
+
+        $this->resultInfo(false);
+
+        $this->closePdo();
+
+        return $this->rowNum;
+    }
+
+    private function resultInfo($is_select = true)
     {
         if($is_select) {
-            $this->items =  $this->pdo->getRow($stmt_key);
+            $this->items =  $this->pdo->getRow($this->stmt_key);
             $this->rowNum = count($this->items);
         } else {
-            $this->rowNum = $this->pdo->rowCount($stmt_key);
+            $this->rowNum = $this->pdo->rowCount($this->stmt_key);
         }
 
-        $this->getLastSql($stmt_key);
-        $this->pdo->closeStmt($stmt_key);
+        $this->getLastSql();
+
+        return $this->items;
+    }
+
+    private function errorResult()
+    {
+        $errorInfo                  = $this->pdo->errorMessage($this->stmt_key);
+        $this->errorMessage         = $errorInfo[2];
+        $this->getLastSql();
 
         return $this;
     }
 
-    private function errorResult($stmt_key)
+    private function getLastSql()
     {
-        $errorInfo                  = $this->pdo->errorMessage($stmt_key);
-        $this->errorMessage         = $errorInfo[2];
-        $this->getLastSql($stmt_key);
-
-        return $this->return;
+        $this->sql                  = $this->pdo->executeSql($this->stmt_key);
+        echo '<br>', "[sql] {$this->sql}";
     }
 
-    private function getLastSql($stmt_key)
+    private function closePdo()
     {
-        $this->sql                  = $this->pdo->executeSql($stmt_key);
+        $this->pdo->closeStmt($this->stmt_key);
     }
 
 }

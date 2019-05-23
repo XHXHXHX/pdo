@@ -1,61 +1,97 @@
 <?php
 
-namespace pro\Database;
+namespace Database;
 
-class Model {
+class Model
+{
 
     protected $db;
     protected $result;
     protected $prepare;
-    protected $bindParam;
+    protected $bindParam = [];
     protected $sql = [
-        'select' => '',
-        'table' => '',
-        'join' => '',
-        'where' => '',
-        'group' => '',
-        'order' => '',
-        'having' => '',
-        'offset' => '',
-        'limit' => '',
+        'select'        => '',
+        'table'         => '',
+        'join'          => '',
+        'where'         => '',
+        'group'         => '',
+        'order'         => '',
+        'having'        => '',
+        'offset'        => '',
+        'limit'         => '',
+        'update'        => '',
+        'insert'        => [],
+        'insert_field'  => '',
     ];
 
-    public function __construct(DB $db)
+    public function __construct(DB $db, $type)
     {
         $this->db = $db;
-        $this->dealSqlAttr();
+        $this->dealSqlAttr($type);
     }
 
     public function __get($key)
     {
-        return $this->result->$key;
+        if (isset($this->sql[$key]))
+            return $this->sql[$key];
+        return false;
     }
 
-    public function select(array $pluck_arr = [])
+    public static function select(DB $db)
     {
-        $sql = $this->makeSql('select');
+        $instance = new self($db, 'select');
 
-        $this->result = $this->db->execute($sql, $this->bindParam);
+        $res['sql'] = $instance->makeSql('select');
+        $res['params'] = $instance->bindParam ?: [];
 
-        return $this;
+        return $res;
+    }
+
+    public static function update(DB $db)
+    {
+        $instance = new self($db, 'update');
+
+        $res['sql'] = $instance->makeSql('update');
+        $res['params'] = $instance->bindParam ?: [];
+
+        return $res;
+    }
+
+    public static function insert(DB $db)
+    {
+        $instance = new self($db, 'insert');
+
+        $res['sql'] = $instance->makeSql('insert');
+        $res['params'] = $instance->bindParam ?: [];
+
+        return $res;
+    }
+
+    public static function delete(DB $db)
+    {
+        $instance = new self($db, 'delete');
+
+        $res['sql'] = $instance->makeSql('delete');
+        $res['params'] = $instance->bindParam ?: [];
+
+        return $res;
     }
 
     protected function makeSql($type)
     {
         switch ($type) {
             case 'select':
-                return $this->makeSqlSelect();
-                break;
+                return $this->makeSelectSql();
             case 'insert':
-                break;
+                return $this->makeInsertSql();
             case 'update':
-                break;
+                return $this->makeUpdateSql();
             case 'delete':
-                break;
+                return $this->makeDeleteSql();
         }
     }
 
-    protected function makeSqlSelect()
+    protected function makeSelectSql()
     {
         $sql = '';
 
@@ -63,58 +99,180 @@ class Model {
 
         $sql .= ' from ' . $this->sql['table'];
 
-        if($this->sql['where'])
-            $sql .= ' where ' . $this->sql['where'];
-        if($this->sql['join'])
+        if ($this->sql['join'])
             $sql .= ' ' . $this->sql['join'];
-        if($this->sql['group'])
+        if ($this->sql['where'])
+            $sql .= ' where ' . $this->sql['where'];
+        if ($this->sql['group'])
             $sql .= ' group by ' . $this->sql['group'];
-        if($this->sql['order'])
+        if ($this->sql['order'])
             $sql .= ' order by ' . $this->sql['order'];
-        if($this->sql['having'])
+        if ($this->sql['having'])
             $sql .= ' having ' . $this->sql['having'];
-        if($this->sql['offset'])
-            $sql .= ' offset ' . $this->sql['offset'];
-        if($this->sql['limit'])
+        if ($this->sql['limit'])
             $sql .= ' limit ' . $this->sql['limit'];
+        if ($this->sql['offset'])
+            $sql .= ' offset ' . $this->sql['offset'];
+
+        return $sql;
+    }
+
+    protected function makeInsertSql()
+    {
+        $sql = '';
+
+        $sql .= 'insert into ' . $this->sql['table'];
+
+        $sql .= ' ' . $this->sql['insert_field'];
+
+        $sql .= ' VALUES ' . $this->sql['insert'];
+
+        return $sql;
+    }
+
+    protected function makeUpdateSql()
+    {
+        $sql = '';
+
+        $sql .= 'update ' . $this->sql['table'];
+
+        $sql .= ' set ' . $this->sql['update'];
+
+        $sql .= ' where ' . $this->sql['where'];
+
+        return $sql;
+    }
+
+    protected function makeDeleteSql()
+    {
+        $sql = '';
+
+        $sql .= 'delete from ' . $this->sql['table'];
+
+        $sql .= ' where ' . $this->sql['where'];
 
         return $sql;
     }
 
     /*处理sql属性*/
-    protected function dealSqlAttr()
+    protected function dealSqlAttr($type)
     {
-        $this->dealSqlAttrSelect();
         $this->dealSqlAttrTable();
-        $this->dealSqlAttrJoin();
-        $this->dealSqlAttrWhere();
-        $this->dealSqlAttrGroup();
-        $this->dealSqlAttrOrder();
-        $this->delaSqlAttrHaving();
-        $this->delaSqlAttrOffset();
-        $this->delaSqlAttrLimit();
+
+        switch ($type) :
+            case 'select':
+                $this->dealSqlAttrSelect();
+                $this->dealSqlAttrJoin();
+                $this->dealSqlAttrWhere();
+                $this->dealSqlAttrGroup();
+                $this->dealSqlAttrOrder();
+                $this->delaSqlAttrHaving();
+                $this->delaSqlAttrOffset();
+                $this->delaSqlAttrLimit();
+                break;
+            case 'insert':
+                $this->dealSqlAttrInsert();
+                $this->dealSqlAttrIncrement();
+                break;
+            case 'update':
+                $this->dealSqlAttrUpdate();
+                $this->dealSqlAttrWhere();
+                break;
+            case 'delete':
+                $this->dealSqlAttrWhere();
+                break;
+
+        endswitch;
+    }
+
+    protected function dealSqlAttrInsert()
+    {
+        $this->insertArrayValDeal($this->db->insert);
+        $this->insertArrayKeyDeal($this->db->insert);
+
+        $this->sql['insert'] = implode(',', $this->sql['insert']);
+    }
+
+    protected function insertArrayValDeal($array)
+    {
+        foreach ($array as $value) {
+            if(is_array($value)) {
+                $this->insertArrayValDeal($value);
+                continue;
+            }
+
+            $this->bindParams($value);
+        }
+
+        if(array_keys($array) !== range(0, count($array) - 1))
+        $this->sql['insert'][] = '(' . implode(",", array_fill(0, count($array), "?")) . ')';
+    }
+
+    protected function insertArrayKeyDeal($array)
+    {
+        $keys = array_keys($array);
+
+        if($keys === range(0, count($array) - 1))
+            $keys = array_keys($array[0]);
+
+        $this->sql['insert_field'] = '(' . implode(',', $keys) . ')';
+    }
+
+
+
+    protected function dealSqlAttrUpdate()
+    {
+        if(empty($this->db->update)) return;
+
+        $data = [];
+
+        foreach ($this->db->update as $key => $value) {
+                $data[] = "`{$key}` = ?";
+            $this->bindParams($value);
+        }
+
+        $this->sql['update'] = implode(',', $data);
+    }
+
+    protected function dealSqlAttrIncrement()
+    {
+        if(empty($this->db->increment)) return;
+
+        $data = [];
+
+        foreach ($this->db->increment as $value) {
+            $data[] = "`{$value['field']}` = {$value['field']} {$value['value']}";
+        }
+
+        $char = empty($this->sql['update']) ? '' : ',';
+        $this->sql['update'] =  $char . implode(',', $data);
     }
 
     protected function dealSqlAttrSelect()
     {
-        $this->sql['select'] = impldoe(',', $this->db->select);
+        $this->sql['select'] = implode(',', $this->db->select);
     }
 
     protected function dealSqlAttrTable()
     {
-        $this->sql['table'] = $this->db->prefix . $this->db->table;
+        $this->sql['table'] = "`{$this->db->prefix}{$this->db->table['table']}`";
+
+        if(!empty($this->db->table['alias']))
+            $this->sql['table'] .= "as {$this->db->table['alias']}";
     }
 
     protected function dealSqlAttrJoin()
     {
+        if(empty($this->db->join)) return;
+
         $join = [];
 
         foreach ($this->db->join as $value) {
 
-            $join_string = $value['type'] . ' ' . $this->db->prefix . $value['table'];
+            $join_string = $value['type'] . '`' . $this->db->prefix . $value['table'] . '`';
 
-            if($value['alias'])
-                $join_string .= ' AS '.$value['alias'];
+            if ($value['alias'])
+                $join_string .= ' AS ' . $value['alias'];
 
             $join_string .= ' ON ' . $value['table_field'] . ' ' . $value['operator'] . ' ' . $value['other_field'];
 
@@ -129,20 +287,29 @@ class Model {
         $where = [];
         foreach ($this->db->where as $value) {
 
-            $where_string = count($where) == 0 ? '' : $value['relation_type'];
-
-            if ($value['operator'] == 'in')
-                $where_string .=  " {$value['field']} in (" . implode(',', array_fill(0, count($value['value'], '?'))) . ")";
-            else if ($value['operator'] == 'between')
-                $where_string .= " {$value['field']} between {$value['value'][0]} and {$value['value'][1]}";
-            else
-                $where_string .= " {$value['field']} {$value['operator']} {$value['value']}";
-
-            $where[] = $where_string;
-            $this->bindParam = array_merge($this->bindParam, $value['value']);
+            if ($value['operator'] == 'in' || $value['operator'] == 'not in')
+                $where[] = $this->whereInSql($value);
+            else if ($value['operator'] == 'between' || $value['operator'] == 'not between')
+                $where[] = $this->whereBetweenSql($value);
+            else {
+                $where[] .= "{$value['relation_type']} {$value['field']} {$value['operator']} ?";
+            }
+            $this->bindParams($value['value']);
         }
 
-        $this->sql['where'] = implode(' ', $where);
+        $where = ltrim(ltrim(implode(' ', $where), 'and'), 'or');
+
+        $this->sql['where'] = $where;
+    }
+
+    protected function whereInSql($value)
+    {
+        return "{$value['relation_type']} {$value['field']} {$value['operator']} (" . implode(',', array_fill(0, count($value['value']), '?')) . ")";
+    }
+
+    protected function whereBetweenSql($value)
+    {
+        return "{$value['relation_type']} {$value['field']} {$value['operator']} ? and ?";
     }
 
     protected function dealSqlAttrGroup()
@@ -152,9 +319,8 @@ class Model {
 
     protected function dealSqlAttrOrder()
     {
-        $this->sql['order'] = implode(',', array_map(function($value){
-            return implode(' ', $value);
-        }, $this->db->orderBy));
+
+        $this->sql['order'] = implode(',', $this->db->orderBy);
     }
 
     protected function delaSqlAttrHaving()
@@ -172,6 +338,12 @@ class Model {
     {
         if($this->db->limit)
             $this->sql['limit'] = $this->db->limit;
+    }
+
+    protected function bindParams($value)
+    {
+        $value = is_array($value) ? $value : (array)$value;
+        $this->bindParam = array_merge($this->bindParam, $value);
     }
 
 

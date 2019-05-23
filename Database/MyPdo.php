@@ -1,11 +1,15 @@
 <?php
 
-namespace pro\Database;
+namespace Database;
 
-class Mysql{
+use Exception\MyException;
+
+class MyPdo{
 
     private $con;
-    private $db_option = array(PDO::ATTR_PERSISTENT=>true,PDO::ATTR_ERRMODE=>2,PDO::MYSQL_ATTR_INIT_COMMAND=>'SET NAMES utf8');
+    private $db_option = array(\PDO::ATTR_PERSISTENT=>true,
+                                \PDO::ATTR_ERRMODE=>2,
+                                \PDO::MYSQL_ATTR_INIT_COMMAND=>'SET NAMES utf8');
     private $stmt_arr = [];
     private $unique_prefix_length = 6;      // 唯一性前缀长度
     private $unique_string = '0123456789~!@#$%^&*()-=_+[]{},.M<>?abcdefghijklmnopqrstuvwxyzABCDEFGHIGKLMNOPQRSTUVWXYZ';
@@ -20,7 +24,6 @@ class Mysql{
 
     public static $instance;
 
-
     public function __construct($config_filename = '')
     {
         $config = $this->getConfig($config_filename);
@@ -32,7 +35,7 @@ class Mysql{
     /*获取mysql配置信息*/
     protected function getConfig($config_filename)
     {
-        if($config_filename && is_file($config_filename)) {
+        if($config_filename && file_exists($config_filename)) {
             $config = require_once($config_filename);
             return $config;
         }
@@ -50,7 +53,7 @@ class Mysql{
     private function connect($config)
     {
         try{
-            return new PDO("mysql:host=".$config['DB_HOST'].";dbname=".$config['DB_DATABASE'],
+            return new \PDO("mysql:host=".$config['DB_HOST'].";dbname=".$config['DB_DATABASE'],
                         $config['DB_USERNAME'],
                         $config['DB_PASSWORD'],
                         $this->db_option);
@@ -85,10 +88,20 @@ class Mysql{
     /*适合update及insert*/
     public function execute($sql, $params = [])
     {
+        echo $sql;
         $stmt = $this->con->prepare($sql);
+
         $this->bindParams($stmt, $params);
 
-        $stmt->execute();
+        try {
+            $stmt->execute();
+        } catch (\PDOException $e) {
+            $error_info = $this->errorMessage($stmt);
+//            echo 'Connection failed: ' . $e->getMessage();die;
+            MyException::PDOException($e);
+            exit();
+//            throw $e;
+        }
 
         $unique_key = $this->makeUniqid();
         $this->stmt_arr[$unique_key] = $stmt;
@@ -101,10 +114,10 @@ class Mysql{
         if(empty($params) || !is_array($params))
             return;
 
+        // ？ 号占位符
         foreach($params as $key => $value) {
-            if(is_array($value))
-                $value = implode(',', $value);
-            $stmt->bindParam(':'.$key, $value);
+            $data_type = is_numeric($value) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
+            $stmt->bindValue($key + 1, $value, $data_type);
         }
     }
 
@@ -123,7 +136,7 @@ class Mysql{
     # 获取查询结果集
     protected function getRow($stmt)
     {
-        while ($row[] = $stmt->fetch(PDO::FETCH_ASSOC)){}
+        while ($row[] = $stmt->fetch(\PDO::FETCH_ASSOC)){}
         array_pop($row);
 
         return $row;
@@ -138,9 +151,10 @@ class Mysql{
         ob_end_clean();
         ob_flush();
         flush();
-        preg_match('/Sent SQL:[\s\S]*\]([\s\S]*?)P/', $debug_info, $match);
-        $match[1] ?? preg_match('/SQL:[\s\S]*\]([\s\S]*?)P/', $debug_info, $match);
+        preg_match('/Sent SQL:[\s\S]*?\]([\s\S]*?)P/', $debug_info, $match);
+        $match[1] ?? preg_match('/SQL:[\s\S]*?\]([\s\S]*?)P/', $debug_info, $match);
         $sql = $match[1] ?? '';
+
         return trim($sql);
     }
 
@@ -167,14 +181,14 @@ class Mysql{
     # 提交事务
     protected function commit()
     {
-        if(PDO::inTransaction())
+        if(\PDO::inTransaction())
             $this->con->commit();
     }
 
     # 回滚事务
     protected function rollBack()
     {
-        if(PDO::inTransaction())
+        if(\PDO::inTransaction())
             $this->con->rollBack();
     }
 
