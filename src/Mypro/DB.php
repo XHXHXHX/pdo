@@ -256,6 +256,17 @@ class DB extends DB_Base {
         return $this->join('inner join', $table, $table_field, $operator, $other_field, $alias);
     }
 
+    public function count()
+    {
+        $this->select = ['count(*) as total'];
+
+        $this->limit = 1;
+
+        $row = $this->execute(Model::select($this));
+
+        return $row[0]['total'] ?? [];
+    }
+
     # 获取全部
     public function get($field = [])
     {
