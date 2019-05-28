@@ -1,7 +1,9 @@
 <?php
 
-namespace pro;
-define('DB_CONFIG_PATH', 'db_config.php');
+namespace Test;
+require_once '../../vendor/autoload.php';
+
+define('DB_CONFIG_PATH', '../Config/db_config.php');
 //require "ProMysql.php";
 //
 //$ProMysql = new ProMysql();
@@ -15,7 +17,7 @@ define('DB_CONFIG_PATH', 'db_config.php');
 //			->get();
 //
 //use Database\MyPdo;
-use Database\DB;
+use Mypro\DB;
 //
 //require_once 'Database\MyPdo.php';
 
@@ -25,6 +27,12 @@ spl_autoload_register(function ($class) {
         $file .= '.php';
         if (file_exists($file)) {
             include $file;
+            return;
+        }
+        $file = ".." . DIRECTORY_SEPARATOR . $file;
+        if (file_exists($file)) {
+            include $file;
+            return;
         }
     }
 });

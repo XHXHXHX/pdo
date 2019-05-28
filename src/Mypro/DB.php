@@ -1,6 +1,6 @@
 <?php
 
-namespace Database;
+namespace Mypro;
 
 class DB extends DB_Base {
 
