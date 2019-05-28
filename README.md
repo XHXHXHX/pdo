@@ -1,36 +1,47 @@
 # pro
 
-#基于PRO的一个简单地ORM
+# 基于PDO的一个简单地ORM
 
 [GitHub 项目地址](https://github.com/XHXHXHX/pro)
 
-#在用原生写脚本的时候怀念起框架中封装好的ORM，所以仿照laravel写了这个简洁版的ORM，可以链式操作。
+在用原生写脚本的时候怀念起框架中封装好的ORM，所以仿照laravel写了这个简版的ORM，可以链式操作。
 
-##Example:
-```Php
-  $ProMysql->table('product_copy')
-			->leftJoin('product', 'pro_id', 'con_pro_id')
-			->where('pro_id', '<', 100)
-			->where('pro_id', 1)
-			->select('pro_id', 'pro_name')
-			->limit(2)
-			->get();
+## Example:
+
+```php
+ use Mypro\DB;
+ 
+ DB::table('class as c')
+        ->select('c.name as class_name', 's.name as student_name', 's.age', 's.sex')
+        ->leftJoin('relation_class_students as r', 'r.class_id', '=', 'c.id')
+        ->leftJoin('students as s', 'r.student_id', '=', 's.id')
+        ->where('c.grade', 1)
+        ->where('c.class', 1)
+        ->get();
 ```
 
-#实现功能
+### 安装
 
-###条件函数
+`composer require xhxhx/mypro v1.0.2`
+
+### 实现功能
+
+##### 条件函数
 
 * table()
 * select()
 * leftJoin()
-* where()       支持数组或多参数形式
+* where()       支持数组或多参数形式
 * orWhere()
+* whereIn
+* whereBetween
 * group()
 * order()
+* offset()
 * limit()
 
 ###操作函数
+
 * count()
 * findIt()
 * find()
@@ -38,3 +49,7 @@
 * insert()
 * update()
 * delete()
+
+
+
+数据库配置在Config/db_config中
