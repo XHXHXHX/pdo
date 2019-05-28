@@ -1,0 +1,21 @@
+{
+    "name": "xhxhx/Mypro",
+    "description": "pdo",
+    "type": "library",
+    "require": {
+        "php": ">=7.2.1"
+    },
+    "authors": [
+        {
+            "name": "XHXHXHX",
+            "email": "346077168@qq.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "autoload": {
+        "psr-4": {
+            "Mypro\\": "src/"
+        }
+    }
+
+}
