@@ -18,6 +18,7 @@ define('DB_CONFIG_PATH', '../Config/db_config.php');
 //
 //use Database\MyPdo;
 use Mypro\DB;
+
 //
 //require_once 'Database\MyPdo.php';
 
@@ -40,7 +41,7 @@ spl_autoload_register(function ($class) {
 $where = [
     ['c', 'like', '%1%\'--\''],
     'a' => 4,
-    ['b', 'in', [1,2,3]],
+    ['b', 'in', [1, 2, 3]],
 ];
 
 //$res = DB::table('test')->insert([
@@ -50,12 +51,12 @@ $where = [
 //]);
 
 $res = DB::table('class as c')
-        ->select('c.name as class_name', 's.name as student_name', 's.age', 's.sex')
-        ->leftJoin('relation_class_students as r', 'r.class_id', '=', 'c.id')
-        ->leftJoin('students as s', 'r.student_id', '=', 's.id')
-        ->where('c.grade', 1)
-        ->where('c.class', 1)
-        ->get();
+    ->select('c.name as class_name', 's.name as student_name', 's.age', 's.sex')
+    ->leftJoin('relation_class_students as r', 'r.class_id', '=', 'c.id')
+    ->leftJoin('students as s', 'r.student_id', '=', 's.id')
+    ->where('c.grade', 1)
+    ->where('c.class', 1)
+    ->get();
 
 echo '<br>', $res ? 'success' : 'faild', '<br>';
 var_dump($res);
