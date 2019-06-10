@@ -7,7 +7,7 @@ define('DB_CONFIG_PATH', '../Config/db_config.php');
 //require "ProMysql.php";
 //
 //$ProMysql = new ProMysql();
-//sss
+//sssfff
 //$select = $ProMysql->table('  product_copy')
 //			->leftJoin('product', 'pro_id', 'con_pro_id')
 //			->where('pro_id', '<', 100)
