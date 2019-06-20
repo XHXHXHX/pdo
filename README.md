@@ -6,11 +6,9 @@
 
 在用原生写脚本的时候怀念起框架中封装好的ORM，所以仿照laravel写了这个简版的ORM，可以链式操作。
 
-## Example:
+#### SELECT:
 
 ```php
- use Mypro\DB;
- 
  DB::table('class as c')
         ->select('c.name as class_name', 's.name as student_name', 's.age', 's.sex')
         ->leftJoin('relation_class_students as r', 'r.class_id', '=', 'c.id')
@@ -18,6 +16,29 @@
         ->where('c.grade', 1)
         ->where('c.class', 1)
         ->get();
+```
+
+#### UPDATE
+
+```php
+    DB::table('class')
+        ->where('grade', 2)
+        ->where('class', 1)
+        ->update([
+            'teach' => '李老师',
+        ]);
+```
+
+#### INSERT
+
+```php
+    DB::table('class')
+        ->insert([
+            'grade' => 3,
+            'class' => 1,
+            'name'  => '三年1班'
+            'teach' => '李老师',
+        ]);
 ```
 
 ### 安装
